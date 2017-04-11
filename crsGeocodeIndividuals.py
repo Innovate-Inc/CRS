@@ -4,17 +4,19 @@
 ## C:\Python27\ArcGISx6410.4\Lib\site-packages
 import arcpy, sets, pypyodbc, requests
 
+
 ## Create connection to SQL Server database and open a cursor
-connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
-#connection = pypyodbc.connect('Driver={SQL Server};' 'Server=localhost\sqlexpress;' 'Database=CRS;' 'uid=JSONDataWriter;pwd=Write$om3Data4fun!')
-#connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0}; Server=localhost\sqlexpress; Database=CRSSalesforce; uid=JSONDataWriter;pwd=Write$om3Data4fun!')
+#connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
+connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.30.186;' 'Database=Salesforce_Data;' 'uid=sf_intregrationadmin;pwd=JetterbitCRS')
+
 pyCursor = connection.cursor()
 
 print "Made connection."
 
 ## Point to the sde connection
-arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
-#arcpy.env.workspace = "C:\Users\jholder\AppData\Roaming\ESRI\Desktop10.4\ArcCatalog\CRSSalesforce.sde"
+#arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
+arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Connection to 10.15.30.186.sde"
+#arcpy.env.workspace = "D:\Salesforce_Data\Salesforce_Data.sde"
 
 ## Create set of current addresses to match against
 lookupSet = set()
@@ -60,6 +62,12 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
             #try:
             # First field in each view is the concatenated address
             # Use address to geocode
+
+            # If the address does not already exist, check to also see if the Salesforce record was simply updated
+            # If the SF record exists, delete the old one from FC so new data can be written to the SF ID
+            findExisting = "If exists (Select * from INDIVIDUALSFC where id = '" + row[1] + "') Delete from INDIVIDUALSFC where ID = '" + row[1] + "'"
+            pyCursor.execute(findExisting)
+            connection.commit()
         
             response = requests.get('http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/find',
                                             {'text': cleanAddress,
@@ -77,7 +85,7 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                 pyCursor.execute(sqlString)
                 connection.commit()
 
-                print " ------------------"
+                #print " ------------------"
         
     
             else:
@@ -104,10 +112,10 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                     try:
                         for d in pyCursor.fetchone():
                             diocese = d
-                            print diocese
+                            #print diocese
                     except:
                         diocese = ''
-                        print diocese
+                        #print diocese
 
                     ## Find region the point is in
                     intersectString = "Select RegionName from USREGIONSAGOL where Shape.STContains(" + location + ") = 1"
@@ -145,7 +153,7 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                         usState = ''
                 
                      
-                    ## Find table to put output of institutions/individuals
+                    ## Find table to put output of individuals
                     try:
                         print "Start adding to Individuals."
                         
@@ -186,7 +194,7 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
 
 
                         ## Determine if Individual is Parish Ambassador
-                        pacString = "Select ID from Relationships where From_Individual__c = '" + str(row[1]) + "'"
+                        pacString = "Select ID from Relationships where From_Individual__c = '" + str(row[1]) + "' and Second_Relationship_type__c like '%Parish Ambassador%'"
                         #print pacString
                         pyCursor.execute(pacString)
                         try:

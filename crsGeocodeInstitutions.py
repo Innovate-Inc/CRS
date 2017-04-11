@@ -1,20 +1,22 @@
 ## Script created by Jenny Holder, Innovate! Inc. November 2016
+## Creates full institution feature class for both US Ops and Exec Suite
 ## 
 ## Had to install pypyodbc, requests and copied here:
 ## C:\Python27\ArcGISx6410.4\Lib\site-packages
-import arcpy, sets, pypyodbc, requests
+import arcpy, sets, pypyodbc, requests, sys
 
 ## Create connection to SQL Server database and open a cursor
-connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
-#connection = pypyodbc.connect('Driver={SQL Server};' 'Server=localhost\sqlexpress;' 'Database=CRS;' 'uid=JSONDataWriter;pwd=Write$om3Data4fun!')
-#connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0}; Server=localhost\sqlexpress; Database=CRSSalesforce; uid=JSONDataWriter;pwd=Write$om3Data4fun!')
+#connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
+connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.30.186;' 'Database=Salesforce_Data;' 'uid=sf_intregrationadmin;pwd=JetterbitCRS')
+
 pyCursor = connection.cursor()
 
 print "Made connection."
 
 ## Point to the sde connection
-arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
-#arcpy.env.workspace = "C:\Users\jholder\AppData\Roaming\ESRI\Desktop10.4\ArcCatalog\CRSSalesforce.sde"
+#arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
+arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Connection to 10.15.30.186.sde"
+#arcpy.env.workspace = "D:\Salesforce_Data\Salesforce_Data.sde"
 
 ## Create set of current addresses to match against
 lookupSet = set()
@@ -32,7 +34,7 @@ fieldNames = [f.name for f in arcpy.ListFields(fd)]
 print fieldNames
 with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
     for row in sCursor:
-    
+        
     ## For each record in the view:
 
         # Some rows have apostrophes to take care of
@@ -59,7 +61,13 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
             #try:
             # First field in each view is the concatenated address
             # Use address to geocode
-        
+
+            # If the address does not already exist, check to see if the Salesforce record was simply updated
+            # If the SF record exists, delete the old one from FC so new data can be written to the SF ID
+            findExisting = "If exists (Select * from INSTITUTIONSFC where id = '" + row[1] + "') Delete from Institutionsfc where ID = '" + row[1] + "'"
+            pyCursor.execute(findExisting)
+            connection.commit()
+                
             response = requests.get('http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/find',
                                             {'text': cleanAddress,
                                              'f': 'json',
@@ -76,7 +84,7 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                 pyCursor.execute(sqlString)
                 connection.commit()
 
-                print " ------------------"
+                #print " ------------------"
         
     
             else:
@@ -102,14 +110,14 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                     try:
                         for d in pyCursor.fetchone():
                             diocese = d
-                            print diocese
+                            #print diocese
                     except:
                         diocese = ''
-                        print diocese
+                        #print diocese
 
                     ## Find region the point is in
                     intersectString = "Select RegionName from USREGIONSAGOL where Shape.STContains(" + location + ") = 1"
-                   #print intersectString
+                    #print intersectString
                     pyCursor.execute(intersectString)
                     try:
                         for r in pyCursor.fetchone():
@@ -138,13 +146,14 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                     try:
                         for s in pyCursor.fetchone():
                             usState = str(s)
+                            #print usState
                     except:
                         usState = ''
+                        #print usState
                 
                      
-                    ## Find table to put output of institutions/individuals
+                    ## Try inserting into Institutions table
                     try:
-                        print "Start adding to Institutions."
                         if row[9] is None:
                             cathPop = 0
                         else:
@@ -182,8 +191,25 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                             totPop = row[14]
                         #print totPop
 
+                        if row[16] is None:
+                            instAff = ''
+                        else:
+                            instAff = row[16]
+
+                        if row[17] is None:
+                            sixMo = 0
+                        else:
+                            sixMo = row[17]
+                        #print sixMo
+
+                        if row[18] is None:
+                            twelveMo = 0
+                        else:
+                            twelveMo = row[18]
+                        #print twelveMo
+
                         ## Determine if Institution is a CBI (Capacity Building Initiative)
-                        cbiString = "Select ID from Relationships where To_Institution__c = '" + str(row[1]) + "'"
+                        cbiString = "Select ID from Relationships where From_Institution__c = '" + str(row[1]) + "' and Second_Relationship_type__c like '%cbi%'"
                         #print cbiString
                         pyCursor.execute(cbiString)
                         try:
@@ -194,29 +220,46 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                         except:
                             cbi = 'No'
                             #print cbi
+
+
+                        ## Determine if Institution is a Parish Ambassador (PAC)
+                        pacString = "Select ID from Relationships where To_Institution__c = '" + str(row[1]) + "' and Second_Relationship_type__c like '%Parish Ambassador (PAC)%'"
+                        #print pacString
+                        pyCursor.execute(pacString)
+                        try:
+                            for p in pyCursor.fetchone():
+                                #print p
+                                pac = 'Yes'
+                                #print pac
+                        except:
+                            pac = 'No'
+                            #print pac
                         
                         ## Find next Object ID to continue incrementing (unique ID required by ArcGIS)
                         pyCursor.execute("DECLARE @myval int EXEC dbo.next_rowid 'dbo', 'InstitutionsFC', @myval OUTPUT SELECT @myval")
-                        print "Used nextID"
+                        #print "Used nextID"
                         
                         for thisrow in pyCursor.fetchall():
                             nextID = thisrow[0]
                             #print nextID
                        
-                        insertFields = str(nextID) + ", '" + cleanAddress + "', '" + str(row[1]) + "', '"  + cleanName  + "', '" + str(score) + "', '" + str(row[3]) + "', '" + str(row[4]) + "', '" + str(row[5]) + "', '" + str(row[6]) + "', '" + str(row[7]) + "', '" + str(row[8]) + "', '" + str(cathPop) + "', '" + str(hispPop) + "', '" + str(numHS) + "', '" + str(numK8) + "', '" + str(numParish) + "', '" + str(totPop) + "', " + location + ", '" + diocese + "', '" + region + "', '" + congDist + "', '" + cbi + "', '" + usState + "'"
-                        outFields = 'ObjectID, Address, ID, Name, Score, Institution_Type__c, Institution_Sub_Type__c, Institution_Sub_Sub_Type__c, Region__c, ParentID, District__c, Cath_Pop__c, Hisp_Cath_Pop__c, Num_Cath_High_Schools__c, Num_Cath_K8_Schools__c, Num_Parishes__c, Total_pop__c, Shape, Diocese, Region, CongressionalDistrict, CapacityBuildingInitiative, USState'
+                       
+                        insertFields = str(nextID) + ", '" + cleanAddress + "', '" + str(row[1]) + "', '"  + cleanName  + "', '" + str(score) + "', '" + str(row[3]) + "', '" + str(row[4]) + "', '" + str(row[5]) + "', '" + str(row[6]) + "', '" + str(row[7]) + "', '" + str(row[8]) + "', '" + str(cathPop) + "', '" + str(hispPop) + "', '" + str(numHS) + "', '" + str(numK8) + "', '" + str(numParish) + "', '" + str(totPop) + "', " + location + ", '" + diocese + "', '" + region + "', '" + congDist + "', '" + cbi + "', '" + pac + "', '" + usState + "', '" + instAff + "', '" + str(sixMo) + "', '" + str(twelveMo) + "'"
+                        #print insertFields
+                        outFields = 'ObjectID, Address, ID, Name, Score, Institution_Type__c, Institution_Sub_Type__c, Institution_Sub_Sub_Type__c, Region__c, ParentID, District__c, Cath_Pop__c, Hisp_Cath_Pop__c, Num_Cath_High_Schools__c, Num_Cath_K8_Schools__c, Num_Parishes__c, Total_pop__c, Shape, Diocese, Region, CongressionalDistrict, CapacityBuildingInitiative, ParishAmbassador, USState, Institutional_Affiliation__c, Interactions_6_Months__c, Interactions_12_Months__c'
                         sqlString = "Use Salesforce_Data Insert into InstitutionsFC(" + outFields + ") values (" + insertFields + ")"
-                        print sqlString
+                        #print sqlString
                         pyCursor.execute(sqlString)
                         connection.commit()
+                        print "Inserted " + cleanName + " to Institutions table."
                         
                     except:
-                        print "Found error in fields other than name and address."
+                        #print "Found error in fields other than name and address."
                         print "Adding to GeocodeErrors table now..."
                         insertFields = "'" + cleanName + "', '" + str(row[1]) + "', '"  + cleanAddress  + "', '" + str(fd) + "', '" + str(score)  + "'"
                         outFields = 'Name, Id, Address, TableName, Score'
                         sqlString = "Use Salesforce_Data Insert into GeocodeErrors(" + outFields + ") values (" + insertFields + ")"
-                        print sqlString
+                        #print sqlString
                         pyCursor.execute(sqlString)
                         connection.commit()
 
