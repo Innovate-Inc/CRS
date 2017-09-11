@@ -1,11 +1,9 @@
-## Script created by Jenny Holder, Innovate! Inc. December 2016
-## Creates feature class of all opportunties for Exec Suite export (not currently in any maps)
-##
-
-## Need to import unidecode
-import arcpy, pypyodbc, ftfy
-from unidecode import unidecode
-
+## Script created by Jenny Holder, Innovate! Inc. September 2016
+## Associates donations with institutions addresses (locations) and writes all to DonationsFC table
+##  For donations with Fund Name CRS Rice Bowls, record is also written to RiceBowlsFC
+## 
+## May have to install pypyodbc
+import arcpy, pypyodbc, sys, ftfy
 
 ## Create connection to SQL Server database and open a cursor
 connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
@@ -16,14 +14,13 @@ pyCursor = connection.cursor()
 print "Made connection."
 
 ## Point to the sde connection
-arcpy.env.workspace = "C:\\Users\\jenny.holder\\AppData\\Roaming\\Esri\\Desktop10.4\\ArcCatalog\\Salesforce_Data (dev).sde"
+arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
 #arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Connection to 10.15.30.186.sde"
 #arcpy.env.workspace = "D:\Salesforce_Data\Salesforce_Data.sde"
 
-
-## Create set of current donations to match against
+#### Create set of current donations to match against if rerunning manually
 ##lookupSet = set()
-##lookupTable = 'Salesforce_Data.dbo.OpportunitiesFC'
+##lookupTable = 'Salesforce_Data.dbo.DonationsFC'
 ##lookupFields = ["ID"]
 ##with arcpy.da.SearchCursor(lookupTable, lookupFields) as lCursor:
 ##    for row in lCursor:
@@ -32,20 +29,20 @@ arcpy.env.workspace = "C:\\Users\\jenny.holder\\AppData\\Roaming\\Esri\\Desktop1
 ##print "Created Lookup Set."
 
 
-fd = 'Salesforce_Data.dbo.Opportunities'
+fd = 'Salesforce_Data.dbo.Donations'
 fieldNames = [f.name for f in arcpy.ListFields(fd)]
 print fieldNames
 with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
     for row in sCursor:
-        print row
 
+##        ## Use when rerunning manually via lookup set        
 ##        if row[0] in lookupSet:
 ##            pass
 ##            print "Passed " + row[0]
 ##        else:
 
         ## Find point location of Institution
-        locationString = "SELECT Shape.STAsText() FROM InstitutionsFC where ID = '" + str(row[3]) + "'"
+        locationString = "SELECT Shape.STAsText() FROM InstitutionsFC where ID = '" + str(row[6]) + "'"
         #print locationString
         pyCursor.execute(locationString)
         try:
@@ -103,66 +100,64 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
 
         except:
             location = 'Null'
-            #print location
             region = ''
             diocese = ''
             congDist = ''
             usState = ''
 
-        if row[4] is None:
+        if row[1] is None:
             amount = 0
         else:
-            amount = row[4]
+            amount = row[1]
         #print amount
         
-        if row[5] is None:
+        if row[2] is None:
             closeDate = ''
         else:
-            closeDate = row[5]
+            closeDate = row[2]
         #print closeDate
 
-        if row[1] is None:
-            cleanName = '-'
+        if row[3] is None:
+            cleanName = ''
         else:
-            cleanName = ftfy.fix_text(row[1])
-            cleanName = unidecode(cleanName)
+            cleanName = ftfy.fix_text(row[3])
             cleanName = cleanName.replace("'", "''").rstrip()
-
-        if row[2] is None:
-            recordType = '-'
-        else:
-            recordType = ftfy.fix_text(row[2])
-            recordType = unidecode(recordType)
-            #print "Unicode: " + recordType
-            recordType = recordType.replace("'", "''").rstrip()
-            print recordType
-
-        #change to 6
-        if row[6] is None:
-            stageName = '-'
-            print stageName
-        else:
-            stageName = ftfy.fix_text(row[6])
-            stageName = unidecode(stageName)
-            #print "Unidecode: " + stageName
-            stageName = stageName.replace("'", "''").rstrip()
-            print stageName
        
 
-        ## Find next Object ID to continue incrementing
-        pyCursor.execute("DECLARE @myval int EXEC dbo.next_rowid 'dbo', 'OpportunitiesFC', @myval OUTPUT SELECT @myval")
+        ## Find next Object ID to continue incrementing in full Donations table
+        pyCursor.execute("DECLARE @myval int EXEC dbo.next_rowid 'dbo', 'DonationsFC', @myval OUTPUT SELECT @myval")
         for thisrow in pyCursor.fetchall():
             nextID = thisrow[0]
             #print nextID
 
-        insertFields = str(nextID) + ", '" + str(row[0]) + "', '"  + str(amount) + "', '" + str(closeDate) + "', '" + cleanName + "', '" + str(stageName.encode('utf-8')) + "', '" + str(recordType) + "', '" + str(row[3]) + "', '" + region + "', '" + diocese + "', '" + congDist + "', '" + usState + "', " + location
-        outFields = 'ObjectID, ID, Amount, CloseDate, Name, StageName, Type, AccountID, Region, Diocese, CongressionalDistrict, USState, Shape'
-        sqlString = "Use Salesforce_Data Insert into OpportunitiesFC(" + outFields + ") values (" + insertFields + ")"
-        print sqlString
-        print "Added " + str(row[0]) + " to OpportunitiesFC."
+        insertFields = str(nextID) + ", '" + str(row[0]) + "', '"  + str(amount) + "', '" + str(closeDate) + "', '" + str(row[3]) + "', '" + str(row[4]) + "', '" + str(row[5]) + "', '" + str(row[6]) + "', '" + region + "', '" + diocese + "', '" + congDist + "', '" + usState + "', " + location
+        outFields = 'ObjectID, ID, Amount, CloseDate, Name, StageName, Type_, AccountID, Region, Diocese, CongressionalDistrict, USState, Shape'
+        sqlString = "Use Salesforce_Data Insert into DonationsFC(" + outFields + ") values (" + insertFields + ")"
+        #print sqlString
+        print "Added to Donations:" + str(row[0])
         pyCursor.execute(sqlString)
         connection.commit()
 
+        
+        if row[7] is None:
+            pass
+            print "----"
+            
+        elif 'CRS Rice Bowl' in str(row[7]):
+            print str(row[7])
+            ## Find next Object ID to continue incrementing in stand alone Rice Bowls table
+            pyCursor.execute("DECLARE @myval int EXEC dbo.next_rowid 'dbo', 'RiceBowlsFC', @myval OUTPUT SELECT @myval")
+            for thisrow in pyCursor.fetchall():
+                nextID = thisrow[0]
+                #print nextID
+
+            insertFields = str(nextID) + ", '" + str(row[0]) + "', '"  + str(amount) + "', '" + str(closeDate) + "', '" + str(row[3]) + "', '" + str(row[4]) + "', '" + str(row[5]) + "', '" + str(row[6]) + "', '" + region + "', '" + diocese + "', '" + congDist + "', '" + usState + "', " + location
+            outFields = 'ObjectID, ID, Amount, CloseDate, Name, StageName, Type_, AccountID, Region, Diocese, CongressionalDistrict, USState, Shape'
+            sqlString = "Use Salesforce_Data Insert into RiceBowlsFC(" + outFields + ") values (" + insertFields + ")"
+            #print sqlString
+            print "*** Added to Rice Bowls:" + str(row[0])
+            pyCursor.execute(sqlString)
+            connection.commit()
 
 ## Close/delete the cursor and the connection
 pyCursor.close()

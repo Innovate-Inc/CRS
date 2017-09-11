@@ -1,10 +1,13 @@
-## Script created by Jenny Holder, Innovate! Inc. December 2016
+## Script created by Jenny Holder, Innovate! Inc.
+## Created: December 2016
+## Updated: September 2017
 ## Creates an exhaustive Projects table, including countries listed in associated DSPN records,
 ##      finds the most updated list of donors based on the awards table, and calculates
 ##      all fiscal years a project is/was active
 ## 
 ## May have to install pypyodbc, ftfy, html5lib, webencodings, wcwidth
 import arcpy, pypyodbc, sys, ftfy
+from unidecode import unidecode
 
 ## Create connection to SQL Server database and open a cursor
 connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
@@ -15,8 +18,8 @@ pyCursor = connection.cursor()
 print "Made connection."
 
 ## Point to the sde connection
-arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
-#arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Connection to 10.15.30.186.sde"
+arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.5\ArcCatalog\Salesforce_Data (dev).sde"
+#arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.5\ArcCatalog\Connection to 10.15.30.186.sde"
 #arcpy.env.workspace = "D:\Salesforce_Data\Salesforce_Data.sde"
 
 fd = 'Salesforce_Data.dbo.Projects'
@@ -38,13 +41,10 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
         if row[1] is None:
             projName = ''
         else:
-            #projName = row[1]
-            #print projName + " -- before"
             projName = ftfy.fix_text(row[1])
-            print projName + "--ftfy"
+            projName = unidecode(projName)
+            print projName + "--unidecode"
             projName = projName.replace("'", "''").rstrip()
-            print projName + " -- after"
-
 
         if row[3] is None:
             startDate = ''
@@ -73,25 +73,24 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                 if donorList == 1:
                     pyCursor.execute("SELECT Name FROM Institutions where ID = '" + thisrow[0] + "'")
                     for thisDonor in pyCursor.fetchall():
-                        print thisDonor[0]
+                        #print thisDonor[0]
                         projDonor1 = ftfy.fix_text(thisDonor[0])
-                        print projDonor1 + " -- 1 donor ftfy"
+                        projDonor1 = unidecode(projDonor1)
                         projDonor1 = projDonor1.replace("'", "''").rstrip()
-                        print projDonor1 + " -- 1 donor after"
+                        #print projDonor1 + " -- 1 donor after"
                     projDonor2 = ''
                     projDonor3 = ''
                     projDonor4 = ''
                     projDonor5 = ''
                 if donorList == 2:
-                    print "In donor #2"
                     try:
                         pyCursor.execute("SELECT Name FROM Institutions where ID = '" + thisrow[0] + "'")
                         for thisDonor in pyCursor.fetchall():
-                            print thisDonor[0]
+                            #print thisDonor[0]
                             projDonor2 = ftfy.fix_text(thisDonor[0])
-                            print projDonor2 + " -- 2 donor ftfy"
+                            projDonor2 = unidecode(projDonor2)
                             projDonor2 = projDonor2.replace("'", "''").rstrip()
-                            print projDonor2 + " -- 2 donor after"
+                            #print projDonor2 + " -- 2 donor after"
                         print projDonor2
                     except:
                         projDonor2 = ''
@@ -100,11 +99,11 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                     try:
                         pyCursor.execute("SELECT Name FROM Institutions where ID = '" + thisrow[0] + "'")
                         for thisDonor in pyCursor.fetchall():
-                            print thisDonor[0]
+                            #print thisDonor[0]
                             projDonor3 = ftfy.fix_text(thisDonor[0])
-                            print projDonor3 + " -- 3 donor ftfy"
+                            projDonor3 = unidecode(projDonor3)
                             projDonor3 = projDonor3.replace("'", "''").rstrip()
-                            print projDonor3 + " -- 3 donor after"
+                            #print projDonor3 + " -- 3 donor after"
                         print projDonor3
                     except:
                         projDonor3 = ''
@@ -113,11 +112,11 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                     try:
                         pyCursor.execute("SELECT Name FROM Institutions where ID = '" + thisrow[0] + "'")
                         for thisDonor in pyCursor.fetchall():
-                            print thisDonor[0]
+                            #print thisDonor[0]
                             projDonor4 = ftfy.fix_text(thisDonor[0])
-                            print projDonor4 + " -- donor 4 ftfy"
+                            projDonor4 = unidecode(projDonor4)
                             projDonor4 = projDonor4.replace("'", "''").rstrip()
-                            print projDonor4 + " -- donor 4 after"
+                            #print projDonor4 + " -- donor 4 after"
                         print projDonor4
                     except:
                         projDonor4 = ''
@@ -126,11 +125,11 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                     try:
                         pyCursor.execute("SELECT Name FROM Institutions where ID = '" + thisrow[0] + "'")
                         for thisDonor in pyCursor.fetchall():
-                            print thisDonor[0]
+                            #print thisDonor[0]
                             projDonor5 = ftfy.fix_text(thisDonor[0])
-                            print projDonor5 + " -- 5 donor ftfy"
+                            projDonor5 = unidecode(projDonor5)
                             projDonor5 = projDonor5.replace("'", "''").rstrip()
-                            print projDonor5 + " -- 5 donor after"
+                            #print projDonor5 + " -- 5 donor after"
                         print projDonor5
                     except:
                         projDonor5 = ''
@@ -143,12 +142,12 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
             projDonor4 = ''
             projDonor5 = ''
 
-        print "-----------------------------"
-        print projDonor1
-        print projDonor2
-        print projDonor3
-        print projDonor4
-        print projDonor5
+        #print "-----------------------------"
+        #print projDonor1
+        #print projDonor2
+        #print projDonor3
+        #print projDonor4
+        #print projDonor5
         print "-----------------------------"
 
         # Region
@@ -160,7 +159,7 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
 
         # Find list of fiscal years project is active
         #     Fiscal year defined October 1, Year - September 30, Year+1
-        if row[3] is None:
+        if row[3] is None or row[4] is None:
             fYears = ''
         else:
            # print row[3]
@@ -232,8 +231,6 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                     #print nextID
         
                 insertFields = str(nextID) + ", '" + projLink + "', '" + sfID + "', '" + projName + "', '"  + indvCountry  + "', '" + fyString + "', '" + str(startDate) + "', '" + str(endDate) + "', '"  + projDonor1 + "', '" + projDonor2 + "', '" + projDonor3 + "', '" + projDonor4 + "', '" + projDonor5 + "', '" + region + "', '" + str(row[12]) + "', '" + str(row[13]) + "'"
-                print type(insertFields)
-                print insertFields
                 outFields = 'ObjectID, ProjectLink, ID, Name, Country_New__c, FY, Start_Date__c, End_Date__c, Project_Donor__c, Project_Donor_2__c, Project_Donor_3__c, Project_Donor_4__c, Project_Donor_5__c, Region__c, Program_Areas__c, Program_Areas_Service_Areas__c, Shape'
                 sqlString = "Use Salesforce_Data Declare @g geometry; Set @g = (SELECT poly.Shape FROM countriesAGOL as poly where poly.country = '" + country + "') Insert into ExecutiveProjectsFC (" + outFields + ") values (" + insertFields + ", @g)"
                 print sqlString
@@ -244,7 +241,7 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
         # If only one country is listed on the project, check for other countries listed on the DPSN record    
         else:
             country = row[2].encode("utf8").rstrip()
-            print country
+            #print country
 
             if country not in countryNames:
                 countryNames.append(country)
@@ -258,11 +255,8 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                 pyCursor.execute("DECLARE @myval int EXEC dbo.next_rowid 'dbo', 'ExecutiveProjectsFC', @myval OUTPUT SELECT @myval")
                 for thisrow in pyCursor.fetchall():
                     nextID = thisrow[0]
-                    print nextID
 
                 insertFields = str(nextID) + ", '" + projLink + "', '" + sfID + "', '" + projName + "', '"  + indvCountry + "', '" + fyString + "', '" + str(startDate) + "', '" + str(endDate) + "', '"  + projDonor1 + "', '" + projDonor2 + "', '" + projDonor3 + "', '" + projDonor4 + "', '" + projDonor5 + "', '" + region + "', '" + str(row[12]) + "', '" + str(row[13]) + "'"
-                print type(insertFields)
-                print insertFields
                 outFields = 'ObjectID, ProjectLink, ID, Name, Country_New__c, FY, Start_Date__c, End_Date__c, Project_Donor__c, Project_Donor_2__c, Project_Donor_3__c, Project_Donor_4__c, Project_Donor_5__c, Region__c, Program_Areas__c, Program_Areas_Service_Areas__c, Shape'            
                 sqlString = "Use Salesforce_Data Declare @g geometry; Set @g = (SELECT poly.Shape FROM countriesAGOL as poly where poly.country = '" + country + "') Insert into ExecutiveProjectsFC (" + outFields + ") values (" + insertFields + ", @g)"
                 print sqlString

@@ -1,21 +1,24 @@
-## Script created by Jenny Holder, Innovate! Inc. September 2016
-## Associates donations with institutions addresses (locations) and writes all to DonationsFC table
-##  For donations with Fund Name CRS Rice Bowls, record is also written to RiceBowlsFC
-## 
+## Script created by Jenny Holder, Innovate! Inc.
+## Created: September 2016
+## Updated: September 2017
+## Purpose: Associates donations with institutions addresses (locations) and writes all to DonationsFC table
+##      For donations with Fund Name CRS Rice Bowls, record is also written to RiceBowlsFC
+## Had to install pypyodbc, requests, unidecode and copied here:
 ## May have to install pypyodbc
-import arcpy, pypyodbc, sys
+import arcpy, pypyodbc, sys, ftfy
+from unidecode import unidecode
 
 ## Create connection to SQL Server database and open a cursor
-#connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
-connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.30.186;' 'Database=Salesforce_Data;' 'uid=sf_intregrationadmin;pwd=JetterbitCRS')
+connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
+#connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.30.186;' 'Database=Salesforce_Data;' 'uid=sf_intregrationadmin;pwd=JetterbitCRS')
 
 pyCursor = connection.cursor()
 
 print "Made connection."
 
 ## Point to the sde connection
-#arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
-arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Connection to 10.15.30.186.sde"
+arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
+#arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Connection to 10.15.30.186.sde"
 #arcpy.env.workspace = "D:\Salesforce_Data\Salesforce_Data.sde"
 
 #### Create set of current donations to match against if rerunning manually
@@ -116,7 +119,32 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
         else:
             closeDate = row[2]
         #print closeDate
-       
+
+        if row[3] is None:
+            cleanName = ''
+        else:
+            cleanName = ftfy.fix_text(row[3])
+            cleanName = unidecode(cleanName)
+            cleanName = cleanName.replace("'", "''").rstrip()
+
+        if row[4] is None:
+            stageName = '-'
+            print stageName
+        else:
+            stageName = ftfy.fix_text(row[4])
+            stageName = unidecode(stageName)
+            #print "Unidecode: " + stageName
+            stageName = stageName.replace("'", "''").rstrip()
+            print stageName
+
+        if row[5] is None:
+            recordType = '-'
+        else:
+            recordType = ftfy.fix_text(row[5])
+            recordType = unidecode(recordType)
+            #print "Unicode: " + recordType
+            recordType = recordType.replace("'", "''").rstrip()
+            print recordType        
 
         ## Find next Object ID to continue incrementing in full Donations table
         pyCursor.execute("DECLARE @myval int EXEC dbo.next_rowid 'dbo', 'DonationsFC', @myval OUTPUT SELECT @myval")
@@ -124,7 +152,7 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
             nextID = thisrow[0]
             #print nextID
 
-        insertFields = str(nextID) + ", '" + str(row[0]) + "', '"  + str(amount) + "', '" + str(closeDate) + "', '" + str(row[3]) + "', '" + str(row[4]) + "', '" + str(row[5]) + "', '" + str(row[6]) + "', '" + region + "', '" + diocese + "', '" + congDist + "', '" + usState + "', " + location
+        insertFields = str(nextID) + ", '" + str(row[0]) + "', '"  + str(amount) + "', '" + str(closeDate) + "', '" + str(cleanName) + "', '" + str(stageName) + "', '" + str(recordType) + "', '" + str(row[6]) + "', '" + region + "', '" + diocese + "', '" + congDist + "', '" + usState + "', " + location
         outFields = 'ObjectID, ID, Amount, CloseDate, Name, StageName, Type_, AccountID, Region, Diocese, CongressionalDistrict, USState, Shape'
         sqlString = "Use Salesforce_Data Insert into DonationsFC(" + outFields + ") values (" + insertFields + ")"
         #print sqlString
@@ -145,7 +173,7 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                 nextID = thisrow[0]
                 #print nextID
 
-            insertFields = str(nextID) + ", '" + str(row[0]) + "', '"  + str(amount) + "', '" + str(closeDate) + "', '" + str(row[3]) + "', '" + str(row[4]) + "', '" + str(row[5]) + "', '" + str(row[6]) + "', '" + region + "', '" + diocese + "', '" + congDist + "', '" + usState + "', " + location
+            insertFields = str(nextID) + ", '" + str(row[0]) + "', '"  + str(amount) + "', '" + str(closeDate) + "', '" + str(cleanName) + "', '" + str(stageName) + "', '" + str(recordType) + "', '" + str(row[6]) + "', '" + region + "', '" + diocese + "', '" + congDist + "', '" + usState + "', " + location
             outFields = 'ObjectID, ID, Amount, CloseDate, Name, StageName, Type_, AccountID, Region, Diocese, CongressionalDistrict, USState, Shape'
             sqlString = "Use Salesforce_Data Insert into RiceBowlsFC(" + outFields + ") values (" + insertFields + ")"
             #print sqlString

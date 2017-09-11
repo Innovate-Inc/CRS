@@ -6,17 +6,17 @@ import arcpy, sets, pypyodbc, requests, ftfy
 
 
 ## Create connection to SQL Server database and open a cursor
-connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
-#connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.30.186;' 'Database=Salesforce_Data;' 'uid=sf_intregrationadmin;pwd=JetterbitCRS')
+#connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
+connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.30.186;' 'Database=Salesforce_Data;' 'uid=sf_intregrationadmin;pwd=JetterbitCRS')
 
 pyCursor = connection.cursor()
 
 print "Made connection."
 
 ## Point to the sde connection
-arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
+#arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
 #arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Connection to 10.15.30.186.sde"
-#arcpy.env.workspace = "D:\Salesforce_Data\Salesforce_Data.sde"
+arcpy.env.workspace = "D:\Salesforce_Data\Salesforce_Data.sde"
 
 ## Create set of current addresses to match against
 lookupSet = set()
@@ -72,21 +72,19 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
             #try:
             # First field in each view is the concatenated address
             # Use address to geocode
-
             # If the address does not already exist, check to also see if the Salesforce record was simply updated
             # If the SF record exists, delete the old one from FC so new data can be written to the SF ID
             findExisting = "If exists (Select * from INDIVIDUALSFC where id = '" + row[1] + "') Delete from INDIVIDUALSFC where ID = '" + row[1] + "'"
             pyCursor.execute(findExisting)
             connection.commit()
-        
-            response = requests.get('http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/find',
-                                            {'text': cleanAddress,
-                                             'f': 'json',
-                                             'outSR': '3857'})
+            requestString = 'http://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?singleLine=' + cleanAddress + '&outFields=*&f=json&outSR=3857'
+            #response = requests.get(requestString)
             response = response.json()
-            if len(response['locations']) == 0:
+            print response
+            if len(response['candidates']) == 0:
                 ## Write to output about it
                 ## Insert errors into "error" type
+                ## This means there is no match for the address
                 score = 0
                 insertFields = "'" + cleanName + "', '" + str(row[1]) + "', '"  + cleanAddress  + "', '" + str(fd) + "', '" + str(score) + "'"
                 outFields = 'Name, Id, Address, TableName, Score'
@@ -96,10 +94,16 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                 connection.commit()
     
             else:
-                x = response['locations'][0]['feature']['geometry']['x']
-                y = response['locations'][0]['feature']['geometry']['y']
-                score = response['locations'][0]['feature']['attributes']['Score']
-                addressType = response['locations'][0]['feature']['attributes']['Addr_Type']
+                # A location is returned and assigned x/y, but
+                # Score is no longer being returned by the geocoding services
+                # Score now entered into the database is arbitrary, for the time being
+                #score = response['locations'][0]['feature']['attributes']['Score']
+                x = response['candidates'][0]['location']['x']
+                y = response['candidates'][0]['location']['y']
+                score = response['candidates'][0]['score']
+                #attributes = response['locations'][0]['feature']['attributes']
+                #print attributes
+                #addressType = response['locations'][0]['feature']['attributes']['Addr_Type']
                 if score <= 79.99:
                     insertFields = "'" + cleanName + "', '" + str(row[1]) + "', '"  + cleanAddress + "', '" + str(fd) + "', '" + str(score)  + "'"
                     outFields = 'Name, Id, Address, TableName, Score'
@@ -107,11 +111,10 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                     pyCursor.execute(sqlString)
                     connection.commit()
                 else:
-                   
+               
                     ## Create shape value from x,y point
                     location = "geometry::STPointFromText('Point (" + str(x) + " " + str(y) + ")', 3857)"
                     #print location
-                    
                     ## Find diocese the point is in
                     intersectString = "Select Name_other from USDIOCESESAGOL where Shape.STContains(" + location + ") = 1"
                     #print intersectString
@@ -214,17 +217,17 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
                             nextID = thisrow[0]
                             #print nextID
                      
-                        insertFields = str(nextID) + ", '" + cleanAddress + "', '" + str(row[1]) + "', '"  + cleanName  + "', '" + str(score) + "', '" + titlec + "', '" + str(row[4]) + "', '" + str(row[5]) + "', " + location + ", '" + diocese + "', '" + region + "', '" + congDist + "', '" + str(row[6]) + "', '" + str(row[7]) + "', '" + ccgp + "', '" + grat + "', '" + pac + "', '" + usState + "'"
-                        outFields = 'OBJECTID, Address, Id, Name, Score, Title__c, AccountID, Relationship_Types__c, Shape, Diocese, Region, CongressionalDistrict, kw__Chamber__c, kw__StateOfCoverage__c, GrassrootsSupporter, ActionTaker, ParishAmbassador, USState'
+                        insertFields = str(nextID) + ", '" + cleanAddress + "', '" + str(row[1]) + "', '"  + cleanName  + "', '" + titlec + "', '" + str(row[4]) + "', '" + str(row[5]) + "', " + location + ", '" + diocese + "', '" + region + "', '" + congDist + "', '" + str(row[6]) + "', '" + str(row[7]) + "', '" + ccgp + "', '" + grat + "', '" + pac + "', '" + usState + "'"
+                        outFields = 'OBJECTID, Address, Id, Name, Title__c, AccountID, Relationship_Types__c, Shape, Diocese, Region, CongressionalDistrict, kw__Chamber__c, kw__StateOfCoverage__c, GrassrootsSupporter, ActionTaker, ParishAmbassador, USState'
                         sqlString = "Use Salesforce_Data Insert into INDIVIDUALSFC(" + outFields + ") values (" + insertFields + ")"
                         #print sqlString
                         print "Inserting " + cleanName + " into Individuals table."
                         pyCursor.execute(sqlString)
                         connection.commit()
                     except:
-                        print "Found error in fields other than name and address."
+                        #print "Found error in fields other than name and address."
                         print "Adding to GeocodeErrors table now..."
-                        print row
+                        score = 0
                         insertFields = "'" + cleanName + "', '" + str(row[1]) + "', '"  + cleanAddress  + "', '" + str(fd) + "', '" + str(score)  + "'"
                         outFields = 'Name, Id, Address, TableName, Score'
                         sqlString = "Use Salesforce_Data Insert into GeocodeErrors(" + outFields + ") values (" + insertFields + ")"

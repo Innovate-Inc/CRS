@@ -1,0 +1,16 @@
+exec projects (& projects)
+
+change Region__C and FY
+
+alter table executiveprojectsfc
+alter column region__c nvarchar(255) null
+alter column FY nvarchar(max) null
+
+Add ProjectLink
+
+
+Add 4 packages to C:\Python27\ArcGISx6410.4\Lib\site-packages
+webencodings
+wcwidth
+html5lib
+ftfy

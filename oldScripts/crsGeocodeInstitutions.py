@@ -3,19 +3,19 @@
 ## 
 ## Had to install pypyodbc, requests and copied here:
 ## C:\Python27\ArcGISx6410.4\Lib\site-packages
-import arcpy, sets, pypyodbc, requests, ftfy
+import arcpy, sets, pypyodbc, requests, sys
 
 ## Create connection to SQL Server database and open a cursor
-connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
-#connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.30.186;' 'Database=Salesforce_Data;' 'uid=sf_intregrationadmin;pwd=JetterbitCRS')
+#connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.230.244\dev;' 'Database=Salesforce_Data;' 'uid=jenny.holder;pwd=crs4fun')
+connection = pypyodbc.connect('Driver={SQL Server Native Client 11.0};' 'Server=10.15.30.186;' 'Database=Salesforce_Data;' 'uid=sf_intregrationadmin;pwd=JetterbitCRS')
 
 pyCursor = connection.cursor()
 
 print "Made connection."
 
 ## Point to the sde connection
-arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
-#arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Connection to 10.15.30.186.sde"
+#arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Salesforce_Data (dev).sde"
+arcpy.env.workspace = "C:\Users\jenny.holder\AppData\Roaming\Esri\Desktop10.4\ArcCatalog\Connection to 10.15.30.186.sde"
 #arcpy.env.workspace = "D:\Salesforce_Data\Salesforce_Data.sde"
 
 ## Create set of current addresses to match against
@@ -26,17 +26,7 @@ with arcpy.da.SearchCursor(lookupTable, lookupFields) as lCursor:
     for row in lCursor:
         address = row[0].encode("utf8") 
         lookupSet.add(address)
-print "Created Institutions Address Lookup Set."
-
-
-lookupSetID = set()
-lookupTableID = 'Salesforce_Data.dbo.InstitutionsFC'
-lookupFieldsID = ["ID"]
-with arcpy.da.SearchCursor(lookupTableID, lookupFieldsID) as lCursor:
-    for row in lCursor:
-        sfID = row[0].encode("utf8") 
-        lookupSetID.add(sfID)
-print "Created Institutions ID Lookup Set."
+print "Created Lookup Set."
         
 
 fd = 'Salesforce_Data.dbo.vInstitutionsAddress'
@@ -50,22 +40,21 @@ with arcpy.da.SearchCursor(fd, fieldNames) as sCursor:
         # Some rows have apostrophes to take care of
         # Create clean version of Address field to insert back into database
         if row[0] is None:
-            cleanAddress = '-'
+            cleanAddress = '-' 
+        elif row[0].find("'") > -1:
+            cleanAddress = row[0].replace("'", "").encode("utf8")
         else:
-            cleanAddress = ftfy.fix_text(row[0])
-            cleanAddress = cleanAddress.replace("'", "''").rstrip()
+            cleanAddress = row[0].encode("utf8")
 
         # Create clean version of Name field to insert back into database
-        if row[2] is None:
-            cleanName = ''
-            print cleanName
+        if row[2].find("'") > -1:
+            cleanName = row[2].replace("'", "").encode("utf8")
+            cleanName = cleanName.strip()
         else:
-            cleanName = ftfy.fix_text(row[2])
-            #print cleanName + "--ftfy"
-            cleanName = cleanName.replace("'", "''").rstrip()
-            print cleanName
+            cleanName = row[2].encode("utf8")
+            cleanName = cleanName.strip()
 
-        if cleanAddress in lookupSet and row[1] in lookupSetID:
+        if cleanAddress in lookupSet:
             pass
             print "Passed " + cleanAddress
         else:

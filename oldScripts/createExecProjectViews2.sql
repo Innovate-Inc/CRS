@@ -459,7 +459,7 @@ FROM            (SELECT        SUM(TotalProjects) AS TotalProjects, Country_New_
 WHERE        (a.Country_New__c IS NOT NULL)
 
 
-create view [dbo].[vExecutiveProjectsWaterSanitationFY2015] as
+create view [dbo].[vExecutiveProjectsWaterSanitationFY2016] as
 
 SELECT        a.Country_New__c AS ProjectCountry, a.TotalProjects, c.TotalDSPNs, b.TotalBSDIs, c.FY_to_Date_Expend, c.Current_FY_Amend_Budget, c.Incept_To_Date_Expend, c.Obligated_Amount, b.Direct_Beneficiaries, 
                          b.Indirect_Beneficiaries, b.Total_Beneficiaries, poly.Shape
